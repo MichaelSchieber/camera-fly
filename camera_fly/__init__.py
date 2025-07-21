@@ -16,7 +16,7 @@ bl_info = {
     "author": "Michael Schieber",
     "description": "",
     "blender": (4, 2, 0),
-    "version": (1, 0, 2),
+    "version": (1, 0, 3),
     "location": "",
     "warning": "",
     "category": "Generic",

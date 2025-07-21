@@ -1,6 +1,6 @@
 schema_version = "1.0.0"
 id = "camerafly"
-version = "1.0.2"
+version = "1.0.3"
 name = "Camerafly"
 tagline = "Fly around with the Dolly Rig of the Camera Rigs Addon"
 maintainer = "Michael Schieber <michaeldschieber@gmx.de>"
@@ -17,7 +17,7 @@ wheel-path = "./wheels"
 [permissions]
 
 [build]
-source = "./camera-fly"
+source = "./camera_fly"
 build = "./extension_build_dir/build"
 dist = "./extension_build_dir/dist"
 paths = [
