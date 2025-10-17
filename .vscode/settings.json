@@ -1,5 +1,5 @@
 {
-    "blender.addon.sourceDirectory": "camera-fly",
+    "blender.addon.sourceDirectory": "camera_fly",
     "flake8.args": [
         "\"flake8.args\": [\"--max-line-length=120\"]"
     ]

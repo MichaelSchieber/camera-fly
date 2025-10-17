@@ -1,7 +1,6 @@
-
 import bpy
-from bpy.types import Operator, PropertyGroup
-from bpy.props import FloatProperty, PointerProperty
+from bpy.types import PropertyGroup
+from bpy.props import FloatProperty
 from math import radians
 from mathutils import Matrix, Vector
 
@@ -76,8 +75,6 @@ class CameraFlyProperties(PropertyGroup):
     )
 
 
-
-
 class POSE_OT_move_rotate_bone_local_pivot(bpy.types.Operator):
     """Move and Rotate pose bone using local orientation and rotate around its own pivot"""
     bl_idname = "pose.move_rotate_bone_local_pivot"
@@ -111,10 +108,15 @@ class POSE_OT_move_rotate_bone_local_pivot(bpy.types.Operator):
     _camera_rig = None
     _root_bone = None
     _aim_bone = None
+    _camera_bone = None
 
     # Store the last keyframe type
     _last_keyframe_type = 'ALL'  # Default to keyframe all (loc, rot, scale)
 
+    _forward = None
+    _right = None
+    _up = None
+    _local_matrix = None
     # Property for accessing the aim distance step now moved to CameraFlyProperties
 
     def modal(self, context, event):
@@ -133,9 +135,6 @@ class POSE_OT_move_rotate_bone_local_pivot(bpy.types.Operator):
                 self.cancel(context)
                 return {'CANCELLED'}
 
-        # Use the stored references
-        obj = self._camera_rig
-        bone = self._root_bone
 
         if event.type == 'ESC' or event.type == 'SPACE':
             self.cancel(context)
@@ -146,9 +145,18 @@ class POSE_OT_move_rotate_bone_local_pivot(bpy.types.Operator):
             if self._initial_aim_pos and self._initial_root_pos:
                 print("Restoring initial positions")
 
-
-                self._root_bone.matrix = self._initial_root_pos
-                self._aim_bone.location = self._initial_aim_pos
+                print("self._initial_root_pos", self._initial_root_pos)
+                print("self._initial_camera_pos", self._initial_camera_pos)
+                print("self._initial_aim_pos", self._initial_aim_pos)
+                
+                self._root_bone.matrix_basis = self._initial_root_pos
+                #print("self._root_bone.matrix", self._root_bone.matrix)
+                print("self._camera_bone.matrix", self._camera_bone.matrix)
+                self._camera_bone.matrix_basis = self._initial_camera_pos
+                print("self._camera_bone.matrix", self._camera_bone.matrix)
+                self._aim_bone.matrix_basis = self._initial_aim_pos
+                #print("self._aim_bone.matrix", self._aim_bone.matrix)
+                
 
                 self.cancel(context)
                 return {'CANCELLED'}
@@ -173,35 +181,10 @@ class POSE_OT_move_rotate_bone_local_pivot(bpy.types.Operator):
             self.keys_pressed.discard(event.type)
 
         if event.type == 'TIMER' and context.area:
-            if context.mode != 'POSE' or not obj or obj.type != 'ARMATURE':
+            if context.mode != 'POSE' or not self._camera_rig or self._camera_rig.type != 'ARMATURE':
                 self.report({'WARNING'}, "Not in Pose Mode or camera rig not found")
                 self.cancel(context)
                 return {'CANCELLED'}
-
-            self.last_matrix = bone.matrix_basis.copy()
-
-            # Get local axes from bone's matrix_basis
-            local_matrix = bone.matrix_basis.to_3x3()
-            forward = local_matrix @ Vector((0, 1, 0))
-            right = local_matrix @ Vector((1, 0, 0))
-            up = local_matrix @ Vector((0, 0, 1))
-
-            delta = Vector()
-
-            if 'W' in self.keys_pressed:
-                delta += forward
-            if 'S' in self.keys_pressed:
-                delta -= forward
-            if 'D' in self.keys_pressed:
-                delta += right
-            if 'A' in self.keys_pressed:
-                delta -= right
-            if 'E' in self.keys_pressed:
-                delta += up
-            if 'Q' in self.keys_pressed:
-                delta -= up
-
-
 
             if event.shift and not self.speed_change:
                 # Update the scene property directly with new max of 100.0
@@ -227,15 +210,8 @@ class POSE_OT_move_rotate_bone_local_pivot(bpy.types.Operator):
 
             if not event.alt:
                 self.rot_mode_change = False
-
-            # if delta.length > 0:
-            #     # Apply speed multiplier with Shift/Ctrl
-            #     speed = self.move_speed
-            #     if event.shift:
-            #         speed *= 2.0
-            #     elif event.ctrl:
-            #         speed *= 0.5
-            bone.location += delta.normalized() * self.move_speed
+            
+            self.move_cam_mode(context)
 
             if not 'Y' in self.keys_pressed and not 'C' in self.keys_pressed:
                 self.initial_aim_set = False
@@ -244,101 +220,11 @@ class POSE_OT_move_rotate_bone_local_pivot(bpy.types.Operator):
             if not event.type == 'TIMER':
                 print(event.type)
         if event.type == 'MOUSEMOVE':
-            # Calculate yaw angle based on mouse X movement
-            yaw_angle = radians(self.rotate_speed_deg) * (event.mouse_x - event.mouse_prev_x) / 100.0
 
-            # Calculate pitch angle based on mouse Y movement
-            pitch_angle = radians(self.rotate_speed_deg) * (event.mouse_y - event.mouse_prev_y) / 100.0
 
-            local_matrix = bone.matrix_basis.to_3x3()
-            forward = local_matrix @ Vector((0, 1, 0))
-            right = local_matrix @ Vector((1, 0, 0))
-            up = local_matrix @ Vector((0, 0, 1))
-
-            if hasattr(bpy.context.scene, 'camerafly_settings'):
-                settings = bpy.context.scene.camerafly_settings
-
-                if settings.rotation_mode == 'AIM' and settings.active_camera and settings.active_camera.parent:
-                    # In AIM mode, rotate around the aim bone's location
-                    rig = settings.active_camera.parent
-                    if rig and rig.type == 'ARMATURE' and 'MCH-Aim_shape_rotation' in rig.pose.bones:
-                        aim_bone = rig.pose.bones['MCH-Aim_shape_rotation']
-
-                        # Get the initial aim bone position in world space (only once)
-                        #if not hasattr(self, '_initial_aim_pos'):
-                        #    self._initial_aim_mat = rig.matrix_world @ aim_bone.matrix
-                        #    self._initial_aim_pos = self._initial_aim_mat.translation
-                        if not self.initial_aim_set:
-                            self.initial_aim_set = True
-                            self._initial_aim_mat = rig.matrix_world @ aim_bone.matrix
-                            self._initial_aim_loc = self._initial_aim_mat.translation
-                        # Use the initial position to keep the aim bone fixed
-                        aim_pos = self._initial_aim_loc
-
-                        # Get the bone's world matrix and position
-                        bone_world = obj.matrix_world @ bone.matrix
-                        bone_pos = bone_world.translation
-
-                        # Calculate the offset from the aim bone to the current bone
-                        offset = bone_pos - aim_pos
-
-                        # Use world Z axis for yaw rotation
-                        yaw_axis = Vector((0, 0, 1))
-                        # Use right vector (bone's local X) for pitch rotation in world space
-                        pitch_axis = obj.matrix_world.to_3x3() @ right.normalized()
-
-                        # Create rotation matrices
-                        yaw_mat = Matrix.Rotation(yaw_angle, 4, yaw_axis)
-                        pitch_mat = Matrix.Rotation(-pitch_angle, 4, pitch_axis)
-
-                        # Combine rotations (pitch first, then yaw)
-                        combined_rot = yaw_mat @ pitch_mat
-
-                        # Apply combined rotation to the offset
-                        rotated_offset = combined_rot @ offset.normalized() * offset.length
-
-                        # Calculate new bone position
-                        new_pos = aim_pos + rotated_offset
-
-                        # Convert back to local space
-                        new_pos_local = obj.matrix_world.inverted() @ new_pos
-
-                        # Update bone location
-                        bone.location = new_pos_local
-
-                        # Restore the aim bone's original position
-                        aim_bone.matrix.translation = self._initial_aim_mat.translation
-
-                        # Maintain the bone's rotation relative to the aim bone
-                        # by applying the combined rotation to the bone's rotation
-                        bone_rot = bone_world.to_quaternion()
-                        new_rot = (combined_rot.to_quaternion() @ bone_rot).to_euler()
-                        bone.rotation_euler = new_rot
-
-                        # Update the matrix to apply changes
-                        bone.matrix_basis = bone.matrix_basis
-
-                        # Skip the default rotation logic
-                        context.area.tag_redraw()
-                        return {'RUNNING_MODAL'}
-
-            # Default rotation (CAMERA mode or fallback)
-            # Apply both yaw (around world Z) and pitch (around local X) rotations
-            pivot = Matrix.Translation(bone.location)
-
-            # Get world Z for yaw and local X for pitch
-            world_z = Vector((0, 0, 1))  # World Z axis vector for yaw
-            pitch_axis = right.normalized()  # Local X axis for pitch
-
-            # Create rotation matrices for yaw and pitch
-            yaw_rotation = Matrix.Rotation(-yaw_angle, 4, world_z)
-            pitch_rotation = Matrix.Rotation(pitch_angle, 4, pitch_axis)
-
-            # Apply pitch first, then yaw (order matters for correct camera control)
-            # This method preserves the bone's pivot point for both rotations
-            bone.matrix_basis = pivot @ yaw_rotation @ pitch_rotation @ pivot.inverted() @ bone.matrix_basis
-
-            context.area.tag_redraw()
+            self.rotate_cam_mode(context, event)
+            return {'RUNNING_MODAL'}
+            
 
         return {'RUNNING_MODAL'}
 
@@ -381,11 +267,30 @@ class POSE_OT_move_rotate_bone_local_pivot(bpy.types.Operator):
             return rig.pose.bones['Aim']
 
         return None
+    
+    def get_camera_bone(self, camera):
+        """Get the camera bone of the camera's dolly rig."""
+        if not camera or not camera.parent or camera.parent.type != 'ARMATURE':
+            return None
+
+        rig = camera.parent
+        if 'Camera' in rig.pose.bones:
+            return rig.pose.bones['Camera']
+
+        return None
+    
+    def prepare_scene(self, camera):
+        bpy.ops.object.mode_set(mode='OBJECT')
+        bpy.ops.object.select_all(action='DESELECT')
+        rig = camera.parent
+        rig.select_set(True)
+        bpy.context.view_layer.objects.active = rig
+        rig.pose.bones["Camera"].constraints["Track To"].influence = 1
+        bpy.ops.object.mode_set(mode='POSE')
 
     def invoke(self, context, event):
 
-
-
+        self.prepare_scene(context.scene.camerafly_settings.active_camera)
 
         # Check for valid Dolly Rig first
         if hasattr(context.scene, 'camerafly_settings') and context.scene.camerafly_settings.active_camera:
@@ -408,10 +313,17 @@ class POSE_OT_move_rotate_bone_local_pivot(bpy.types.Operator):
             if not self._aim_bone:
                 self.report({'ERROR'}, "Could not find 'aim' bone in the dolly rig")
                 return {'CANCELLED'}
+            
+            # Get the camera bone of the rig
+            self._camera_bone = self.get_camera_bone(camera)
+            if not self._camera_bone:
+                self.report({'ERROR'}, "Could not find 'camera' bone in the dolly rig")
+                return {'CANCELLED'}
 
             # Store the initial positions of the bones
-            self._initial_aim_pos = self._aim_bone.location.copy()
-            self._initial_root_pos = self._root_bone.matrix.copy()
+            self._initial_aim_pos = self._aim_bone.matrix_basis.copy()
+            self._initial_root_pos = self._root_bone.matrix_basis.copy()
+            self._initial_camera_pos = self._camera_bone.matrix_basis.copy()
 
             # Ensure we're in pose mode
             if context.mode != 'POSE':
@@ -510,7 +422,7 @@ class POSE_OT_move_rotate_bone_local_pivot(bpy.types.Operator):
             return False
 
         # Get the camera's forward direction in world space
-        aim_matrix = self._aim_bone.matrix_basis
+        aim_matrix = self._camera_bone.matrix
         forward_vec = aim_matrix.to_3x3() @ Vector((0, 1, 0))  # Camera looks down -Z
 
         # Get aim distance step from scene properties
@@ -535,3 +447,118 @@ class POSE_OT_move_rotate_bone_local_pivot(bpy.types.Operator):
         wm = context.window_manager
         wm.event_timer_remove(self._timer)
         self.keys_pressed.clear()
+    
+    def move_root_bone(self, context):
+        self.last_matrix = self._root_bone.matrix_basis.copy()
+
+        # Get local axes from bone's matrix_basis
+        local_matrix = self._root_bone.matrix_basis.to_3x3()
+        forward = local_matrix @ Vector((0, 1, 0))
+        right = local_matrix @ Vector((1, 0, 0))
+        up = local_matrix @ Vector((0, 0, 1))
+
+        delta = Vector()
+
+        if 'W' in self.keys_pressed:
+            delta += forward
+        if 'S' in self.keys_pressed:
+            delta -= forward
+        if 'D' in self.keys_pressed:
+            delta += right
+        if 'A' in self.keys_pressed:
+            delta -= right
+        if 'E' in self.keys_pressed:
+            delta += up
+        if 'Q' in self.keys_pressed:
+            delta -= up
+        
+        self._root_bone.location += delta.normalized() * self.move_speed
+
+    def move_cam_mode(self, context):
+        self.last_matrix_camera = self._camera_bone.matrix_basis.copy()
+        self.last_matrix_aim = self._aim_bone.matrix_basis.copy()
+
+        self.set_directions(self._camera_bone)
+        delta = self.get_delta()
+        self.translate_bone(self._camera_bone, delta)
+        self.translate_bone(self._aim_bone, delta)
+
+    def rotate_cam_mode(self, context, mouse_event):
+        self.set_angles(mouse_event)
+        self.set_directions(self._camera_bone)
+        if bpy.context.scene.camerafly_settings.rotation_mode == 'AIM':
+            self.rotate_around_bone(self._camera_bone, self._aim_bone)
+        else:
+            self.rotate_around_bone(self._aim_bone, self._camera_bone, invert_yaw = True, invert_pitch = True)
+    
+    def rotate_around_bone(self, bone_a, bone_b, invert_yaw = False, invert_pitch = False):
+        # rotates bone a around bone b (only location)
+        bone_a_mat_world = self._camera_rig.matrix_world @ bone_a.matrix
+        bone_b_mat_world = self._camera_rig.matrix_world @ bone_b.matrix
+        
+        bone_a_loc_world = bone_a_mat_world.translation
+        bone_b_loc_world = bone_b_mat_world.translation
+
+        offset_world = bone_a_loc_world - bone_b_loc_world
+        print(offset_world)
+
+        # set axes to rotate around in world space
+        # World Z axis for yaw rotation
+        yaw_axis = Vector((0, 0, 1))
+
+        # right vector (bone's local X) converted to world space for pitch rotation
+        pitch_axis = self._camera_rig.matrix_world.to_3x3() @ self._right.normalized()
+
+        # Create rotation matrices
+        yaw_mat = Matrix.Rotation(self._yaw_angle if not invert_yaw else -self._yaw_angle, 4, yaw_axis)
+        pitch_mat = Matrix.Rotation(-self._pitch_angle if not invert_pitch else self._pitch_angle, 4, pitch_axis)
+
+        # Combine rotations (pitch first, then yaw)
+        combined_rot = yaw_mat @ pitch_mat
+
+        # Apply combined rotation to the offset
+        rotated_offset = combined_rot @ offset_world.normalized() * offset_world.length #Couldnt this just be offset? Normalize and multiply by length cancels each other out?
+        print("rotated offset", rotated_offset)
+        # Calculate new bone position
+        new_pos_world = bone_b_loc_world + rotated_offset
+
+        # Convert back to local space
+        new_pos_local = self._camera_rig.matrix_world.inverted() @ new_pos_world
+        print("new pos local", new_pos_local)
+
+        pose_bone_offset = bone_a.matrix.translation - bone_a.matrix_basis.translation
+        print("pose bone offset", pose_bone_offset)
+        # Update bone location
+        bone_a.location = new_pos_local - pose_bone_offset        
+    
+    def set_directions(self, bone):
+        self._local_matrix = bone.matrix.to_3x3()
+        self._forward = self._local_matrix @ Vector((0, 1, 0))
+        self._right = self._local_matrix @ Vector((1, 0, 0))
+        self._up = self._local_matrix @ Vector((0, 0, 1))
+    
+    def set_angles(self, mouse_event):
+        # Calculate yaw angle based on mouse X movement
+        self._yaw_angle = radians(self.rotate_speed_deg) * (mouse_event.mouse_x - mouse_event.mouse_prev_x) / 100.0
+
+        # Calculate pitch angle based on mouse Y movement
+        self._pitch_angle = radians(self.rotate_speed_deg) * (mouse_event.mouse_y - mouse_event.mouse_prev_y) / 100.0
+    
+    def translate_bone(self, bone, delta):
+        bone.location += delta.normalized() * self.move_speed
+    
+    def get_delta(self):
+        delta = Vector()
+        if 'W' in self.keys_pressed:
+            delta += self._forward
+        if 'S' in self.keys_pressed:
+            delta -= self._forward
+        if 'D' in self.keys_pressed:
+            delta += self._right
+        if 'A' in self.keys_pressed:
+            delta -= self._right
+        if 'E' in self.keys_pressed:
+            delta += self._up
+        if 'Q' in self.keys_pressed:
+            delta -= self._up
+        return delta
