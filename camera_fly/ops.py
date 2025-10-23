@@ -136,11 +136,12 @@ class POSE_OT_move_rotate_bone_local_pivot(bpy.types.Operator):
                 return {'CANCELLED'}
 
 
-        if event.type == 'ESC' or event.type == 'SPACE':
+        if event.type == 'LEFTMOUSE' or event.type == 'SPACE':
             self.cancel(context)
-            return {'CANCELLED'}
+            self.report({'INFO'}, "Accepted changes")
+            return {'FINISHED'}
 
-        if event.type == 'RIGHTMOUSE':
+        if event.type == 'RIGHTMOUSE' or event.type == 'ESC':
             print("Right mouse button pressed")
             if self._initial_aim_pos and self._initial_root_pos:
                 print("Restoring initial positions")
@@ -159,6 +160,7 @@ class POSE_OT_move_rotate_bone_local_pivot(bpy.types.Operator):
                 
 
                 self.cancel(context)
+                self.report({'INFO'}, "Reversed changes")
                 return {'CANCELLED'}
             return {'RUNNING_MODAL'}
 
@@ -378,7 +380,7 @@ class POSE_OT_move_rotate_bone_local_pivot(bpy.types.Operator):
             'SCALE': 'Scale only',
             'ALL': 'Location, Rotation & Scale'
         }
-        bones_to_keyframe = [self._root_bone, self._aim_bone]
+        bones_to_keyframe = [self._camera_bone, self._aim_bone]
         # Determine keyframe type based on modifier keys
         keyframe_type = 'ALL'
 
@@ -447,6 +449,7 @@ class POSE_OT_move_rotate_bone_local_pivot(bpy.types.Operator):
         wm = context.window_manager
         wm.event_timer_remove(self._timer)
         self.keys_pressed.clear()
+        bpy.ops.object.mode_set(mode='OBJECT')
     
     def move_root_bone(self, context):
         self.last_matrix = self._root_bone.matrix_basis.copy()

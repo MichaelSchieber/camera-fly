@@ -10,13 +10,17 @@ if not hasattr(bpy.types.WindowManager, 'camerafly_show_help'):
 def draw_shortcut(layout: UILayout, label: str, keys: list, description: str = ""):
     """Simplified helper function to draw keyboard shortcuts"""
     row = layout.row(align=True)
-    row.label(text=label + ":")
+    control_col = row.column(align=True)
+    control_col.label(text=label + ":")
 
+    key_col = row.column(align=True)
+    key_row = key_col.row(align=True)
+    key_row.alignment = 'RIGHT'
     # Draw the keys
     for i, key in enumerate(keys):
         if i > 0:
-            row.label(text="+")
-        row.label(text=key, icon='EVENT_' + key if hasattr(bpy.types.UILayout, 'EVENT_' + key) else 'NONE')
+            key_row.label(text="+")
+        key_row.label(text=key, icon='EVENT_' + key if hasattr(bpy.types.UILayout, 'EVENT_' + key) else 'NONE')
 
     # Add description as tooltip
     #if description:
@@ -38,39 +42,42 @@ def draw_help_section(layout):
 
     col = help_box.column()
 
-    # Two column layout for shortcuts
-    row = col.row()
-    left_col = row.column()
-    right_col = row.column()
-
     # Left column - Movement & Camera
-    left_col.label(text="Movement:", icon='ARROW_LEFTRIGHT')
-    draw_shortcut(left_col, "Forward/Back", ["W", "S"])
-    draw_shortcut(left_col, "Left/Right", ["A", "D"])
-    draw_shortcut(left_col, "Up/Down", ["E", "Q"])
-    draw_shortcut(left_col, "Adjust Speed", ["SHIFT", "CTRL"], "Hold to modify speed")
+    col.label(text="Movement:", icon='ARROW_LEFTRIGHT')
+    draw_shortcut(col, "Forward/Back", ["W", "S"])
+    draw_shortcut(col, "Left/Right", ["A", "D"])
+    draw_shortcut(col, "Up/Down", ["E", "Q"])
+    draw_shortcut(col, "Adjust Speed", ["SHIFT", "CTRL"], "Hold to modify speed")
 
-    left_col.separator()
-    left_col.label(text="Camera:", icon='CAMERA_DATA')
-    draw_shortcut(left_col, "Yaw/Pitch", ["MOUSE"], "Mouse movement")
-    draw_shortcut(left_col, "Toggle Mode", ["ALT"], "Camera/Aim modes")
+    col.separator()
+    col.label(text="Camera:", icon='CAMERA_DATA')
+    draw_shortcut(col, "Yaw/Pitch", ["MOUSE"], "Mouse movement")
+    draw_shortcut(col, "Toggle Mode", ["ALT"], "Camera/Aim modes")
 
     # Right column - Aim & Animation
-    right_col.label(text="Aim:", icon='TRACKER')
-    draw_shortcut(right_col, "Forward", ["WHEELUP"], "Increase focal distance")
-    draw_shortcut(right_col, "Backward", ["WHEELDOWN"], "Decrease focal distance")
+    col.separator()
+    col.label(text="Aim:", icon='TRACKER')
+    draw_shortcut(col, "Forward", ["WHEELUP"], "Increase focal distance")
+    draw_shortcut(col, "Backward", ["WHEELDOWN"], "Decrease focal distance")
 
-    right_col.separator()
-    right_col.label(text="Animation:", icon='KEYINGSET')
-    draw_shortcut(right_col, "Keyframe", ["I"], "Insert keyframe")
-    draw_shortcut(right_col, "Loc Only", ["I", "SHIFT"], "Location keyframe")
-    draw_shortcut(right_col, "Rot Only", ["I", "CTRL"], "Rotation keyframe")
+    col.separator()
+    col.label(text="Animation:", icon='KEYINGSET')
+    draw_shortcut(col, "Keyframe", ["I"], "Insert keyframe")
+    # draw_shortcut(col, "Loc Only", ["I", "SHIFT"], "Location keyframe")
+    # draw_shortcut(col, "Rot Only", ["I", "CTRL"], "Rotation keyframe")
+
 
     # Actions at bottom
     col.separator()
-    action_row = col.row()
-    action_row.label(text="Exit:", icon='PANEL_CLOSE')
-    action_row.label(text="ESC / RIGHTMOUSE")
+    action_row_1 = col.row()
+    action_col_1 = action_row_1.column()
+    action_col_2 = action_row_1.column()
+    action_col_1.alignment = 'LEFT'
+    action_col_2.alignment = 'RIGHT'
+    action_col_1.label(text="Accept:", icon='CHECKMARK')
+    action_col_2.label(text="LEFTMOUSE / SPACE")
+    action_col_1.label(text="Exit:", icon='X')
+    action_col_2.label(text="RIGHTMOUSE / ESC")
 
 
 class CAMERAFLY_PT_main_panel(Panel):
@@ -93,11 +100,7 @@ class CAMERAFLY_PT_main_panel(Panel):
 
         # Minimal compact header with help toggle
         header_row = layout.row(align=True)
-        # Title and status in one
-        status_text = "Ready" if context.mode == 'POSE' else "Needs Pose Mode"
-        status_icon = 'CHECKMARK' if context.mode == 'POSE' else 'ERROR'
         header_row.label(text=f"Camera Fly", icon='CAMERA_DATA')
-        header_row.label(text=status_text, icon=status_icon)
 
         # Help toggle
         help_icon = 'HIDE_ON' if wm.camerafly_show_help else 'HELP'
