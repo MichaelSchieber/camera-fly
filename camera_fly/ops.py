@@ -70,7 +70,7 @@ class CameraFlyProperties(PropertyGroup):
             ('CAMERA', "Camera", "Rotate the camera directly"),
             ('AIM', "Aim", "Rotate the aim target (Dolly Rig only)")
         ],
-        default='AIM' if bpy.app.version >= (2, 80) else 'CAMERA',
+        default='CAMERA',
         update=lambda self, context: None  # Needed for undo/redo
     )
 
@@ -338,10 +338,17 @@ class POSE_OT_move_rotate_bone_local_pivot(bpy.types.Operator):
 
             # Deselect all bones
             for bone in rig.pose.bones:
-                bone.bone.select = False
+
+                if bpy.app.version[0] >= 5:
+                    bone.select = False
+                else:
+                    bone.bone.select = False
 
             # Select only the root bone
-            self._root_bone.bone.select = True
+            if bpy.app.version[0] >= 5:
+                self._root_bone.select = True
+            else:
+                self._root_bone.bone.select = True
             rig.data.bones.active = self._root_bone.bone
 
             # Store references to the camera rig and root bone for use in modal method

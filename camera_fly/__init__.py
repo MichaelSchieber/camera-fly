@@ -11,16 +11,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-bl_info = {
-    "name": "Camerafly",
-    "author": "Michael Schieber",
-    "description": "",
-    "blender": (4, 5, 0),
-    "version": (2, 1, 0),
-    "location": "",
-    "warning": "",
-    "category": "Generic",
-}
+extension_version = (2, 1, 3)
 
 import bpy
 from . import auto_load
@@ -29,7 +20,7 @@ from . import ops
 auto_load.init()
 
 def get_version():
-    version = bl_info["version"]
+    version = extension_version
     parts = str(version).split(",")
     for i in range(len(parts)):
         parts[i] = ''.join(filter(str.isdigit, parts[i]))
