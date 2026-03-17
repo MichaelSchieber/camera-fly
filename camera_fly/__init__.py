@@ -11,7 +11,7 @@
 # You should have received a copy of the GNU General Public License
 # along with this program. If not, see <http://www.gnu.org/licenses/>.
 
-extension_version = (2, 1, 3)
+extension_version = (2, 1, 4)
 
 import bpy
 from . import auto_load

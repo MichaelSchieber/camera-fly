@@ -242,8 +242,9 @@ class POSE_OT_move_rotate_bone_local_pivot(bpy.types.Operator):
 
         # Check if the rig has the expected bones for a Dolly Rig
         # Must include root bone and aim control bones
-        required_bones = {'Root', 'Aim', 'MCH-Aim_shape_rotation'}
-        if not all(bone in rig.pose.bones for bone in required_bones):
+        required_bones_old = {'Root', 'Aim', 'MCH-Aim_shape_rotation'}
+        required_bones_new = {'Root', 'Aim', 'MCH-Aim_widget'}
+        if not all(bone in rig.pose.bones for bone in required_bones_old) and not all(bone in rig.pose.bones for bone in required_bones_new):
             return False
 
         return True
